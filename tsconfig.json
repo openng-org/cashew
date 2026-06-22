@@ -7,7 +7,7 @@
     "esModuleInterop": true,
     "strict": true,
     "paths": {
-      "@ngneat/cashew": ["projects/ngneat/cashew/src/public-api.ts"]
+      "@openng/cashew": ["projects/openng/cashew/src/public-api.ts"]
     },
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,

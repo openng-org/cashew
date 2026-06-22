@@ -59,23 +59,23 @@
         }
       }
     },
-    "@ngneat/cashew": {
-      "root": "projects/ngneat/cashew",
-      "sourceRoot": "projects/ngneat/cashew/src",
+    "@openng/cashew": {
+      "root": "projects/openng/cashew",
+      "sourceRoot": "projects/openng/cashew/src",
       "projectType": "library",
       "prefix": "lib",
       "architect": {
         "build": {
           "builder": "@angular/build:ng-packagr",
           "options": {
-            "project": "projects/ngneat/cashew/ng-package.json"
+            "project": "projects/openng/cashew/ng-package.json"
           },
           "configurations": {
             "production": {
-              "tsConfig": "projects/ngneat/cashew/tsconfig.lib.prod.json"
+              "tsConfig": "projects/openng/cashew/tsconfig.lib.prod.json"
             },
             "development": {
-              "tsConfig": "projects/ngneat/cashew/tsconfig.lib.json"
+              "tsConfig": "projects/openng/cashew/tsconfig.lib.json"
             }
           },
           "defaultConfiguration": "production"

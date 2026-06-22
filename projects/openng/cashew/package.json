@@ -1,5 +1,5 @@
 {
-  "name": "@ngneat/cashew",
+  "name": "@openng/cashew",
   "description": "A simple and flexible library that caches HTTP requests in Angular applications",
   "version": "5.3.0",
   "license": "MIT",
@@ -11,15 +11,15 @@
     "test": "jest"
   },
   "bugs": {
-    "url": "https://github.com/ngneat/cashew/issues"
+    "url": "https://github.com/openng/cashew/issues"
   },
   "peerDependencies": {
     "@angular/core": ">=17.0.0"
   },
-  "homepage": "https://github.com/ngneat/cashew#readme",
+  "homepage": "https://github.com/openng/cashew#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ngneat/cashew"
+    "url": "https://github.com/openng/cashew"
   },
   "keywords": [
     "angular",
