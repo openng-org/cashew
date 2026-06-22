@@ -1,9 +1,9 @@
-name: '@ngneat/cashew'
+name: '@openng/cashew'
 
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
 
 jobs:

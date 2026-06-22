@@ -11,15 +11,15 @@
     "test": "jest"
   },
   "bugs": {
-    "url": "https://github.com/openng/cashew/issues"
+    "url": "https://github.com/openng-foundation/cashew/issues"
   },
   "peerDependencies": {
     "@angular/core": ">=17.0.0"
   },
-  "homepage": "https://github.com/openng/cashew#readme",
+  "homepage": "https://github.com/openng-foundation/cashew#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/openng/cashew"
+    "url": "https://github.com/openng-foundation/cashew"
   },
   "keywords": [
     "angular",
@@ -29,8 +29,7 @@
     "cache http"
   ],
   "author": {
-    "name": "Netanel Basal",
-    "email": "netanel7799@gmail.com",
-    "url": "https://netbasal.com"
+    "name": "OpenNG Foundation",
+    "url": "https://www.openng.org/"
   }
 }
