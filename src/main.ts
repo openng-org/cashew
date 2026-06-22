@@ -1,7 +1,7 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { provideHttpCache, withHttpCacheInterceptor, withLocalStorage, withSessionStorage } from '@ngneat/cashew';
+import { provideHttpCache, withHttpCacheInterceptor, withLocalStorage, withSessionStorage } from '@openng/cashew';
 import { AppComponent } from './app/app.component';
 import { HomeComponent } from './app/home/home.component';
 import { TodosComponent } from './app/todos/todos.component';

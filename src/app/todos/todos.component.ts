@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { CacheBucket, HttpCacheManager, withCache } from '@ngneat/cashew';
+import { CacheBucket, HttpCacheManager, withCache } from '@openng/cashew';
 import { switchMap, tap } from 'rxjs/operators';
 
 @Component({

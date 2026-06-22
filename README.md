@@ -6,14 +6,14 @@
 
 <br />
 
-[![@ngneat/cashew](https://github.com/ngneat/cashew/actions/workflows/ci.yml/badge.svg)](https://github.com/ngneat/cashew/actions/workflows/ci.yml)
+[![@openng/cashew](https://github.com/openng/cashew/actions/workflows/ci.yml/badge.svg)](https://github.com/openng/cashew/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/packagist/l/doctrine/orm.svg?style=flat-square)]()
 [![coc-badge](https://img.shields.io/badge/codeof-conduct-ff69b4.svg?style=flat-square)]()
 [![commitizen](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg?style=flat-square)]()
 [![PRs](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)]()
 [![styled with prettier](https://img.shields.io/badge/styled_with-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier)
 [![All Contributors](https://img.shields.io/badge/all_contributors-5-orange.svg?style=flat-square)](#contributors)
-[![ngneat](https://img.shields.io/badge/@-ngneat-383636?style=flat-square&labelColor=8f68d4)](https://github.com/ngneat/)
+[![openng](https://img.shields.io/badge/@-openng-383636?style=flat-square&labelColor=8f68d4)](https://github.com/openng/)
 
 ## Features
 
@@ -31,7 +31,7 @@ A flexible and straightforward library that caches HTTP requests in Angular
 ## Installation
 
 ```shell script
-$ npm install @ngneat/cashew
+$ npm install @openng/cashew
 ```
 
 ## Usage
@@ -39,7 +39,7 @@ $ npm install @ngneat/cashew
 Use the `provideHttpCache` provider along with `withHttpCacheInterceptor` in your application providers:
 
 ```ts
-import { provideHttpCache, withHttpCacheInterceptor } from '@ngneat/cashew';
+import { provideHttpCache, withHttpCacheInterceptor } from '@openng/cashew';
 
 bootstrapApplication(AppComponent, {
   providers: [provideHttpClient(withInterceptors([withHttpCacheInterceptor()])), provideHttpCache()]
@@ -49,7 +49,7 @@ bootstrapApplication(AppComponent, {
 And you're done! Now, when using Angular `HttpClient`, you can pass the `withCache` function as context, and it'll cache the response:
 
 ```ts
-import { withCache } from '@ngneat/cashew';
+import { withCache } from '@openng/cashew';
 
 @Injectable()
 export class UsersService {
@@ -72,7 +72,7 @@ When working with state management like `Akita` or `ngrx`, there is no need to s
 We can change the mode option to `stateManagement`:
 
 ```ts
-import { withCache } from '@ngneat/cashew';
+import { withCache } from '@openng/cashew';
 
 @Injectable()
 export class UsersService {
@@ -97,7 +97,7 @@ By default, caching is done to app memory. To switch to using, for instance, loc
 > Keep in mind that the local storage has a size limit of 5-10MB depending on the browser, so it is not recommended to cache large responses.
 
 ```ts
-import { provideHttpCache, withHttpCacheInterceptor, withLocalStorage } from '@ngneat/cashew';
+import { provideHttpCache, withHttpCacheInterceptor, withLocalStorage } from '@openng/cashew';
 
 bootstrapApplication(AppComponent, {
   providers: [provideHttpClient(withInterceptors([withHttpCacheInterceptor()])), provideHttpCache(withLocalStorage())]
@@ -123,7 +123,7 @@ Note that `ttl` will also be calculated via local storage in this instance.
 You can also use session storage by using `withSessionStorage()` and `storage: 'sessionStorage'` in the `withCache` function:
 
 ```ts
-import { provideHttpCache, withHttpCacheInterceptor, withSessionStorage } from '@ngneat/cashew';
+import { provideHttpCache, withHttpCacheInterceptor, withSessionStorage } from '@openng/cashew';
 
 bootstrapApplication(AppComponent, {
   providers: [provideHttpClient(withInterceptors([withHttpCacheInterceptor()])), provideHttpCache(withSessionStorage())]
@@ -145,7 +145,7 @@ getUsers() {
 When working with `localStorage` or `sessionStorage`, it's recommended to add a version:
 
 ```ts
-import { withCache } from '@ngneat/cashew';
+import { withCache } from '@openng/cashew';
 
 @Injectable()
 export class UsersService {
@@ -184,7 +184,7 @@ bootstrapApplication(AppComponent, {
 Or by using the `withCache` function:
 
 ```ts
-import { withCache } from '@ngneat/cashew';
+import { withCache } from '@openng/cashew';
 ```ts
 bootstrapApplication(AppComponent, {
   providers: [
@@ -274,7 +274,7 @@ Currently, there is no way in Angular to pass `metadata` to an interceptor. The 
 - `context` - Allow chaining function call that returns an `HttpContext`.
 
 ```ts
-import { requestDataChanged, withCache } from '@ngneat/cashew';
+import { requestDataChanged, withCache } from '@openng/cashew';
 
 @Injectable()
 export class UsersService {
@@ -297,7 +297,7 @@ export class UsersService {
 When you need to call another function that returns an `HttpContext`, you can provide the context option.
 
 ```ts
-import { withCache } from '@ngneat/cashew';
+import { withCache } from '@openng/cashew';
 import { withLoadingSpinner } from '@another/library'; // <-- function that returns an HttpContext
 
 @Injectable()
@@ -328,7 +328,7 @@ The `CacheManager` provider, exposes an API to update and query the cache regist
 `CacheBucket` can be useful when we need to buffer multiple requests and invalidate them at some point. For example:
 
 ```ts
-import { withCache, CacheBucket } from '@ngneat/cashew';
+import { withCache, CacheBucket } from '@openng/cashew';
 
 @Injectable()
 export class TodosService {
@@ -415,16 +415,16 @@ Thanks go to these wonderful people ([emoji key](https://allcontributors.org/doc
 <!-- markdownlint-disable -->
 <table>
   <tr>
-    <td align="center"><a href="https://www.netbasal.com"><img src="https://avatars1.githubusercontent.com/u/6745730?v=4" width="100px;" alt=""/><br /><sub><b>Netanel Basal</b></sub></a><br /><a href="https://github.com/ngneat/cashew/commits?author=NetanelBasal" title="Code">💻</a> <a href="#design-NetanelBasal" title="Design">🎨</a> <a href="https://github.com/ngneat/cashew/commits?author=NetanelBasal" title="Documentation">📖</a> <a href="#ideas-NetanelBasal" title="Ideas, Planning, & Feedback">🤔</a> <a href="#infra-NetanelBasal" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a></td>
-    <td align="center"><a href="https://github.com/itayod"><img src="https://avatars2.githubusercontent.com/u/6719615?v=4" width="100px;" alt=""/><br /><sub><b>Itay Oded</b></sub></a><br /><a href="https://github.com/ngneat/cashew/commits?author=itayod" title="Code">💻</a></td>
-    <td align="center"><a href="https://github.com/shaharkazaz"><img src="https://avatars2.githubusercontent.com/u/17194830?v=4" width="100px;" alt=""/><br /><sub><b>Shahar Kazaz</b></sub></a><br /><a href="https://github.com/ngneat/cashew/commits?author=shaharkazaz" title="Code">💻</a></td>
-    <td align="center"><a href="https://indepth.dev/author/layzee/"><img src="https://avatars1.githubusercontent.com/u/6364586?v=4" width="100px;" alt=""/><br /><sub><b>Lars Gyrup Brink Nielsen</b></sub></a><br /><a href="https://github.com/ngneat/cashew/commits?author=LayZeeDK" title="Documentation">📖</a></td>
+    <td align="center"><a href="https://www.netbasal.com"><img src="https://avatars1.githubusercontent.com/u/6745730?v=4" width="100px;" alt=""/><br /><sub><b>Netanel Basal</b></sub></a><br /><a href="https://github.com/openng/cashew/commits?author=NetanelBasal" title="Code">💻</a> <a href="#design-NetanelBasal" title="Design">🎨</a> <a href="https://github.com/openng/cashew/commits?author=NetanelBasal" title="Documentation">📖</a> <a href="#ideas-NetanelBasal" title="Ideas, Planning, & Feedback">🤔</a> <a href="#infra-NetanelBasal" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a></td>
+    <td align="center"><a href="https://github.com/itayod"><img src="https://avatars2.githubusercontent.com/u/6719615?v=4" width="100px;" alt=""/><br /><sub><b>Itay Oded</b></sub></a><br /><a href="https://github.com/openng/cashew/commits?author=itayod" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/shaharkazaz"><img src="https://avatars2.githubusercontent.com/u/17194830?v=4" width="100px;" alt=""/><br /><sub><b>Shahar Kazaz</b></sub></a><br /><a href="https://github.com/openng/cashew/commits?author=shaharkazaz" title="Code">💻</a></td>
+    <td align="center"><a href="https://indepth.dev/author/layzee/"><img src="https://avatars1.githubusercontent.com/u/6364586?v=4" width="100px;" alt=""/><br /><sub><b>Lars Gyrup Brink Nielsen</b></sub></a><br /><a href="https://github.com/openng/cashew/commits?author=LayZeeDK" title="Documentation">📖</a></td>
     <td align="center"><a href="https://raisiqueira.dev"><img src="https://avatars1.githubusercontent.com/u/2914170?v=4" width="100px;" alt=""/><br /><sub><b>Raí Siqueira</b></sub></a><br /><a href="#content-raisiqueira" title="Content">🖋</a></td>
-    <td align="center"><a href="https://github.com/theblushingcrow"><img src="https://avatars3.githubusercontent.com/u/638818?v=4" width="100px;" alt=""/><br /><sub><b>Inbal Sinai</b></sub></a><br /><a href="https://github.com/ngneat/cashew/commits?author=theblushingcrow" title="Code">💻</a> <a href="https://github.com/ngneat/cashew/commits?author=theblushingcrow" title="Documentation">📖</a></td>
-    <td align="center"><a href="https://binary.com.au"><img src="https://avatars2.githubusercontent.com/u/175909?v=4" width="100px;" alt=""/><br /><sub><b>James Manners</b></sub></a><br /><a href="https://github.com/ngneat/cashew/commits?author=jmannau" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/theblushingcrow"><img src="https://avatars3.githubusercontent.com/u/638818?v=4" width="100px;" alt=""/><br /><sub><b>Inbal Sinai</b></sub></a><br /><a href="https://github.com/openng/cashew/commits?author=theblushingcrow" title="Code">💻</a> <a href="https://github.com/openng/cashew/commits?author=theblushingcrow" title="Documentation">📖</a></td>
+    <td align="center"><a href="https://binary.com.au"><img src="https://avatars2.githubusercontent.com/u/175909?v=4" width="100px;" alt=""/><br /><sub><b>James Manners</b></sub></a><br /><a href="https://github.com/openng/cashew/commits?author=jmannau" title="Code">💻</a></td>
   </tr>
   <tr>
-    <td align="center"><a href="https://github.com/mokipedia"><img src="https://avatars3.githubusercontent.com/u/11502273?v=4" width="100px;" alt=""/><br /><sub><b>mokipedia</b></sub></a><br /><a href="https://github.com/ngneat/cashew/commits?author=mokipedia" title="Code">💻</a> <a href="https://github.com/ngneat/cashew/commits?author=mokipedia" title="Documentation">📖</a></td>
+    <td align="center"><a href="https://github.com/mokipedia"><img src="https://avatars3.githubusercontent.com/u/11502273?v=4" width="100px;" alt=""/><br /><sub><b>mokipedia</b></sub></a><br /><a href="https://github.com/openng/cashew/commits?author=mokipedia" title="Code">💻</a> <a href="https://github.com/openng/cashew/commits?author=mokipedia" title="Documentation">📖</a></td>
   </tr>
 </table>
 
