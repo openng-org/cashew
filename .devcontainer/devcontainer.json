@@ -18,7 +18,10 @@
 				"angular.ng-template",
 				"editorconfig.editorconfig",
 				"vivaxy.vscode-conventional-commits"
-			]
+			],
+			"settings": {
+				"jest.rootPath": "projects/openng/cashew"
+			}
 		}
 	},
 	"postCreateCommand": "npm install"
