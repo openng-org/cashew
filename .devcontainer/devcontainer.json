@@ -17,7 +17,9 @@
 				"orta.vscode-jest",
 				"angular.ng-template",
 				"editorconfig.editorconfig",
-				"vivaxy.vscode-conventional-commits"
+				"vivaxy.vscode-conventional-commits",
+				"github.vscode-pull-request-github",
+				"github.vscode-github-actions"
 			],
 			"settings": {
 				"jest.rootPath": "projects/openng/cashew"
