@@ -31,6 +31,14 @@ A flexible and straightforward library that caches HTTP requests in Angular
 ## Installation
 
 ```shell script
+$ ng add @openng/cashew
+```
+
+This installs the package and automatically registers `provideHttpCache()` and the cache interceptor in your application config.
+
+Alternatively, install the package manually and follow the [Usage](#usage) section:
+
+```shell script
 $ npm install @openng/cashew
 ```
 
