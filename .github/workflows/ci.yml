@@ -23,6 +23,9 @@ jobs:
       - name: Test
         run: npm run test:lib
 
+      - name: Test Schematics
+        run: npm run test:schematics
+
       - name: Build
         run: npm run build:lib
 

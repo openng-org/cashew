@@ -1,6 +1,7 @@
 {
   "$schema": "../../node_modules/ng-packagr/ng-package.schema.json",
   "dest": "../../../dist/openng/cashew",
+  "assets": ["./schematics/collection.json", "./schematics/ng-add/schema.json"],
   "lib": {
     "entryFile": "src/public-api.ts"
   }

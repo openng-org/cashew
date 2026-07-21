@@ -10,6 +10,10 @@
     "test:watch": "jest --watch",
     "test": "jest"
   },
+  "schematics": "./schematics/collection.json",
+  "ng-add": {
+    "save": "dependencies"
+  },
   "bugs": {
     "url": "https://github.com/openng-foundation/cashew/issues"
   },
