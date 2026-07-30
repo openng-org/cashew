@@ -15,15 +15,15 @@
     "save": "dependencies"
   },
   "bugs": {
-    "url": "https://github.com/openng-foundation/cashew/issues"
+    "url": "https://github.com/openng-org/cashew/issues"
   },
   "peerDependencies": {
     "@angular/core": ">=17.0.0"
   },
-  "homepage": "https://github.com/openng-foundation/cashew#readme",
+  "homepage": "https://github.com/openng-org/cashew#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/openng-foundation/cashew"
+    "url": "https://github.com/openng-org/cashew"
   },
   "keywords": [
     "angular",

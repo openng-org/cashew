@@ -1,0 +1,144 @@
+# ALTERNATIVE release pipeline — NOT the active one.
+#
+# This is the semantic-release variant of .github/workflows/release.yml, kept
+# alongside it so maintainers can compare the two approaches on real files
+# rather than in the abstract (see docs/RELEASING.md for the trade-offs and
+# for how to make this the active workflow).
+#
+# UNVALIDATED: this has never been executed. It deliberately avoids
+# @semantic-release/npm (whose verifyConditions would fail on the not-yet-built
+# dist/ package root) and drives the bump/build/publish through
+# @semantic-release/exec instead, so the publish command is byte-identical to
+# release.yml's and picks up OIDC the same way. Confirm with a real `dry-run`
+# before trusting it. The standard-version variant has no such unknowns because
+# it reuses the tooling this repo already releases with.
+#
+# Requires devDependencies that are NOT installed by default:
+#   semantic-release @semantic-release/changelog @semantic-release/git
+#   @semantic-release/exec
+name: Release (semantic-release)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run (analyze commits + build; no publish, commit, tag, or push)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  id-token: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    if: ${{ github.ref == 'refs/heads/main' || inputs.dry-run }}
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: true
+      matrix:
+        target: ['test:lib', 'test:schematics', 'build:lib', 'build']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: npm run "$TARGET"
+
+  release:
+    needs: gate
+    if: ${{ github.ref == 'refs/heads/main' || inputs.dry-run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # @semantic-release/git commits internally; skip the husky commit-msg
+      # (commitlint) and pre-commit (lint-staged) hooks in CI
+      HUSKY: 0
+    steps:
+      # See the equivalent step in release.yml — the app must be a bypass actor
+      # on the `protect-main` ruleset for @semantic-release/git to push to main.
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ steps.app-token.outputs.token }}
+
+      # No registry-url — see release.yml for why OIDC depends on that
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      # OIDC trusted publishing requires npm >= 11.5.1; Node 22 ships 10.9.x
+      - name: Upgrade npm
+        run: |
+          npm i -g npm@latest
+          npm -v
+
+      - run: npm ci
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # semantic-release runs the whole pipeline itself. With the plugin order
+      # in .releaserc.json the effective sequence is:
+      #   prepare: write CHANGELOG.md -> bump projects/openng/cashew/package.json
+      #            + npm run build:lib -> commit and push to main
+      #   publish: npm publish dist/openng/cashew -> create the GitHub Release
+      # so, as in release.yml, the irreversible npm publish comes after the git
+      # push. Note there is no bump input: semantic-release always infers the
+      # version from the conventional commits since the last tag.
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          DRY=()
+          if [[ "$DRY_RUN" == "true" ]]; then DRY=(--dry-run); fi
+          npx semantic-release "${DRY[@]}"
+
+      - name: Summary
+        if: always()
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          REF: ${{ github.ref }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          {
+            echo "## Release run (semantic-release)"
+            echo ""
+            echo "- Dry run: \`${DRY_RUN}\`"
+            echo "- Ref: \`${REF}\`"
+            echo "- Triggered by: @${ACTOR}"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,232 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump (auto = infer from conventional commits)'
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+          - prerelease
+      dry-run:
+        description: 'Dry run (versions + builds + packs + publish --dry-run; no real publish, commit, tag, or push)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  id-token: write
+
+# Per-ref group: real releases (main-only) still serialize, while a
+# dry-run dispatched from a branch never queue-blocks a real release
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Real releases are main-only; dry-runs touch nothing remote (publish runs
+  # with --dry-run; push/release are gated on !inputs.dry-run), so they may
+  # be dispatched from any branch to test the pipeline
+  gate:
+    if: ${{ github.ref == 'refs/heads/main' || inputs.dry-run }}
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: true
+      matrix:
+        target: ['test:lib', 'test:schematics', 'build:lib', 'build']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: npm run "$TARGET"
+
+  release:
+    needs: gate
+    if: ${{ github.ref == 'refs/heads/main' || inputs.dry-run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # standard-version commits internally; skip the husky commit-msg
+      # (commitlint) and pre-commit (lint-staged) hooks in CI
+      HUSKY: 0
+      PACKAGE_DIR: dist/openng/cashew
+      MANIFEST: projects/openng/cashew/package.json
+    steps:
+      # Mint a short-lived GitHub App installation token. The app must be a
+      # bypass actor on the `protect-main` ruleset, so the release commit/tag
+      # push below is authorized while humans still go through PRs + review.
+      # The token is auto-revoked when the job ends (effective lifetime ≈ job
+      # run) and is scoped to repo Contents only. See docs/RELEASING.md.
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # Least-privilege: the token only needs Contents (push release
+          # commit/tag to main + create the GitHub Release). Declaring it
+          # here enforces the scope at the workflow level instead of relying
+          # solely on the app installation's configured permissions.
+          permission-contents: write
+
+      # Persist the app token so the later `git push HEAD:main` authenticates
+      # as the bypass-capable app — the default GITHUB_TOKEN cannot push to the
+      # protected branch (rejected with GH006).
+      # fetch-depth: 0 + fetch-tags: true are required for standard-version to
+      # find the previous tag; on a shallow clone it treats the whole history
+      # as unreleased and generates a bogus changelog.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ steps.app-token.outputs.token }}
+
+      # Deliberately no registry-url: it writes an .npmrc containing
+      # `_authToken=${NODE_AUTH_TOKEN}`, and with no token set `npm publish`
+      # fails ENEEDAUTH before it ever attempts OIDC. Trusted publishing
+      # (below) depends on that file being absent.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      # OIDC trusted publishing requires npm >= 11.5.1; Node 22 ships 10.9.x
+      - name: Upgrade npm
+        run: |
+          npm i -g npm@latest
+          npm -v
+
+      - run: npm ci
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # Always bump the manifest for real so the version is on disk for the
+      # build + publish steps. On a dry run we pass --skip.commit --skip.tag:
+      # the files are written (never pushed) so the publish dry-run can pack a
+      # non-colliding version, but no commit or tag is made.
+      # projects/openng/cashew/package.json is therefore the authoritative
+      # version source in both modes (a stable JSON contract; drives the
+      # changelog + GitHub release).
+      - name: Version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          set -o pipefail
+          ARGS=()
+          case "$BUMP" in
+            auto) ;;
+            prerelease) ARGS=(--prerelease) ;;
+            *) ARGS=(--release-as "$BUMP") ;;
+          esac
+          if [[ "$DRY_RUN" == "true" ]]; then ARGS+=(--skip.commit --skip.tag); fi
+
+          ( cd projects/openng/cashew && npx standard-version --infile ../../../CHANGELOG.md "${ARGS[@]}" )
+
+          VERSION=$(node -p "require('./$MANIFEST').version")
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Released version: $VERSION"
+
+      # Build AFTER version so the generated dist manifest carries the bumped
+      # version. postbuild:lib also copies README/LICENSE and compiles the
+      # schematics into the package directory.
+      - name: Build
+        run: npm run build:lib
+
+      # The vX.Y.Z tag must be on the remote BEFORE the release step, otherwise
+      # the API invents the tag at the old main HEAD
+      - name: Push commit and tag
+        if: ${{ !inputs.dry-run }}
+        run: git push --follow-tags origin HEAD:main
+
+      # Notes come from the CHANGELOG section standard-version just wrote, so
+      # the GitHub Release and the changelog can never disagree. Uses the app
+      # token (not the default GITHUB_TOKEN) for consistency with the push.
+      - name: GitHub release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -o pipefail
+          awk -v tag="## [$VERSION]" '
+            index($0, tag) == 1 { found = 1; next }
+            found && index($0, "## ") == 1 { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+
+          if [[ -s release-notes.md ]]; then
+            gh release create "v$VERSION" --verify-tag --title "v$VERSION" --notes-file release-notes.md
+          else
+            echo "::warning::No CHANGELOG section found for $VERSION; falling back to generated notes"
+            gh release create "v$VERSION" --verify-tag --title "v$VERSION" --generate-notes
+          fi
+          rm -f release-notes.md
+
+      # Publish LAST: npm publish is irreversible, so it runs only after every
+      # fallible git step (push to protected main, tag push, GitHub release) has
+      # succeeded — preventing an npm-ahead-of-git split-brain where a version
+      # is on the registry while main stays un-updated. Re-running after a
+      # publish failure is safe: npm rejects a version that already exists.
+      # Always runs; on a dry run, --dry-run packs the tarball and exercises
+      # the publish path (version, package dir, tag, access) without uploading
+      # — note this does NOT exercise OIDC auth, which only a real publish
+      # does. Prereleases go to the `next` dist-tag so
+      # `npm i @openng/cashew` (latest) never resolves to a prerelease.
+      # Provenance attestations are generated automatically with trusted
+      # publishing — no --provenance flag needed.
+      - name: Publish to npm (OIDC trusted publishing + provenance)
+        env:
+          BUMP: ${{ inputs.bump }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          TAG="latest"
+          if [[ "$BUMP" == "prerelease" ]]; then TAG="next"; fi
+          DRY=()
+          if [[ "$DRY_RUN" == "true" ]]; then DRY=(--dry-run); fi
+          npm publish "$PACKAGE_DIR" --access public --tag "$TAG" "${DRY[@]}"
+
+      - name: Summary
+        if: always()
+        env:
+          OUT_VERSION: ${{ steps.version.outputs.value }}
+          BUMP: ${{ inputs.bump }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          REF: ${{ github.ref }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          {
+            echo "## Release run"
+            echo ""
+            echo "- Version: \`${OUT_VERSION:-n/a}\`"
+            echo "- Bump input: \`${BUMP}\`"
+            echo "- Dry run: \`${DRY_RUN}\`"
+            echo "- Ref: \`${REF}\`"
+            echo "- Triggered by: @${ACTOR}"
+          } >> "$GITHUB_STEP_SUMMARY"
