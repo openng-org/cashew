@@ -13,21 +13,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Npm install
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-      - run: npm i
+          cache: 'pnpm'
+      - run: pnpm install
 
       - name: Test
-        run: npm run test:lib
+        run: pnpm run test:lib
 
       - name: Test Schematics
-        run: npm run test:schematics
+        run: pnpm run test:schematics
 
       - name: Build
-        run: npm run build:lib
+        run: pnpm run build:lib
 
       - name: Build Playground
-        run: npm run build
+        run: pnpm run build
