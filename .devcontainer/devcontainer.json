@@ -26,5 +26,5 @@
 			}
 		}
 	},
-	"postCreateCommand": "npm install"
+	"postCreateCommand": "corepack enable && corepack prepare pnpm@11.18.0 --activate && pnpm install"
 }
