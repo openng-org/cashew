@@ -1,0 +1,193 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump (auto = infer from conventional commits)'
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+          - prerelease
+      dry-run:
+        description: 'Dry run (builds + packs + publish --dry-run; no real publish, commit, tag, or push)'
+        required: false
+        type: boolean
+        default: true
+permissions:
+  contents: write
+  id-token: write
+# Per-ref group: real releases (main-only) still serialize, while a
+# dry-run dispatched from a branch never queue-blocks a real release
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  # Real releases are main-only; dry-runs touch nothing remote (publish runs
+  # with --dry-run; push/release are gated on !inputs.dry-run), so they may
+  # be dispatched from any branch to test the pipeline
+  gate:
+    if: ${{ github.ref == 'refs/heads/main' || inputs.dry-run }}
+    name: Test & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Test lib
+        run: pnpm run test:lib
+      - name: Test schematics
+        run: pnpm run test:schematics
+      - name: Build lib
+        run: pnpm run build:lib
+      - name: Build playground
+        run: pnpm run build
+  release:
+    needs: gate
+    if: ${{ github.ref == 'refs/heads/main' || inputs.dry-run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Mint a short-lived GitHub App installation token. The app is a bypass
+      # actor on the main branch ruleset, so the release commit/tag push below
+      # is authorized while humans still go through PRs + status checks. The
+      # token is auto-revoked when the job ends (effective lifetime ≈ job run)
+      # and is scoped to repo Contents only.
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # Least-privilege: the token only needs Contents (push release
+          # commit/tag to main + create the GitHub Release). Declaring it
+          # here enforces the scope at the workflow level instead of relying
+          # solely on the app installation's configured permissions.
+          permission-contents: write
+      # Persist the app token so the later `git push HEAD:main` authenticates
+      # as the bypass-capable app — the default GITHUB_TOKEN cannot push to the
+      # protected branch (rejected with GH006)
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup node
+        # Deliberately no registry-url here: setting one makes setup-node write
+        # an .npmrc auth-token placeholder that can shadow npm/pnpm's OIDC
+        # trusted-publishing flow. Trusted publishing only needs `id-token:
+        # write` (set above) plus the registry having this repo + workflow
+        # file registered as a trusted publisher for @openng/cashew.
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      # Reuses the same `pnpm run release` script maintainers already use
+      # locally (standard-version against projects/openng/cashew/package.json,
+      # writing CHANGELOG.md at the repo root) — extra flags after `--` are
+      # appended to the standard-version invocation.
+      # Always bump the manifest for real so the version is on disk for the
+      # build + publish steps. On a dry run we pass --skip.commit --skip.tag:
+      # the file is written (never pushed) so the publish dry-run can pack a
+      # non-colliding version, but no commit or tag is made. package.json is
+      # therefore the authoritative version source in both modes (drives the
+      # GitHub release tag/title).
+      - name: Version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [[ "$DRY_RUN" == "true" ]]; then ARGS+=(--skip.commit --skip.tag); fi
+          if [[ "$BUMP" == "prerelease" ]]; then
+            # "next" identifier lines up with the npm dist-tag used below
+            ARGS+=(--prerelease next)
+          elif [[ "$BUMP" != "auto" ]]; then
+            ARGS+=(--release-as "$BUMP")
+          fi
+          pnpm run release -- "${ARGS[@]}"
+          VERSION=$(node -p "require('./projects/openng/cashew/package.json').version")
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+      # Build AFTER version so dist/openng/cashew/package.json carries the
+      # bumped version (ng-packagr copies it from the source package.json).
+      - name: Build
+        run: pnpm run build:lib
+      # The v{version} tag must be on the remote BEFORE the GitHub release
+      # step below, otherwise the API invents the tag at the old main HEAD.
+      - name: Push commit and tag
+        if: ${{ !inputs.dry-run }}
+        run: git push --follow-tags origin HEAD:main
+      # Uses the app token (not the default GITHUB_TOKEN) since it also needs
+      # to succeed against a protected repo consistently with the push above.
+      - name: GitHub release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: gh release create "v${VERSION}" --title "v${VERSION}" --generate-notes
+      # Publish LAST: pnpm publish is irreversible, so it runs only after
+      # every fallible git step (push to protected main, tag push, GitHub
+      # release) has succeeded — this avoids an npm-ahead-of-git split-brain.
+      # Re-running the workflow after a partial failure is safe: the registry
+      # rejects re-publishing a version that's already there. Always runs; on
+      # a dry run, --dry-run packs the tarball and exercises the publish path
+      # (version, access, tag) without uploading — note this does NOT
+      # exercise OIDC auth, which only a real publish does. Prereleases go to
+      # the `next` dist-tag so `npm i @openng/cashew` (latest) never resolves
+      # to a prerelease. Provenance attestations are generated automatically
+      # with trusted publishing — no extra flag needed.
+      - name: Publish to npm (pnpm, OIDC trusted publishing)
+        env:
+          BUMP: ${{ inputs.bump }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          set -euo pipefail
+          TAG="latest"
+          if [[ "$BUMP" == "prerelease" ]]; then TAG="next"; fi
+          DRY=()
+          if [[ "$DRY_RUN" == "true" ]]; then DRY=(--dry-run); fi
+          cd dist/openng/cashew
+          pnpm publish --access public --tag "$TAG" --no-git-checks "${DRY[@]}"
+      - name: Summary
+        if: always()
+        env:
+          OUT_VERSION: ${{ steps.version.outputs.value }}
+          BUMP: ${{ inputs.bump }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          REF: ${{ github.ref }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          {
+            echo "## Release run"
+            echo ""
+            echo "- Version: \`${OUT_VERSION:-n/a}\`"
+            echo "- Bump input: \`${BUMP}\`"
+            echo "- Dry run: \`${DRY_RUN}\`"
+            echo "- Ref: \`${REF}\`"
+            echo "- Triggered by: @${ACTOR}"
+          } >> "$GITHUB_STEP_SUMMARY"
