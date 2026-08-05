@@ -1,0 +1,64 @@
+# git-cliff configuration — used by .github/workflows/publish.yml to generate
+# organized release notes from conventional commits.
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+
+{% for commit in commits -%}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/openng-foundation/cashew/commit/{{ commit.id }}))
+{% endfor %}
+{% endfor %}
+{% if github.contributors | length != 0 %}
+### Contributors
+
+{% for contributor in github.contributors -%}
+- [@{{ contributor.username }}](https://github.com/{{ contributor.username }})
+{% endfor %}
+{% endif -%}
+{% set first_timers = github.contributors | filter(attribute="is_first_time", value=true) -%}
+{% if first_timers | length != 0 %}
+### New Contributors
+
+{% for contributor in first_timers -%}
+- @{{ contributor.username }} made their first contribution{% if contributor.pr_number %} in #{{ contributor.pr_number }}{% endif %}
+{% endfor %}
+{% endif %}
+{% if previous.version and version %}
+**Full changelog:** [{{ previous.version }}...{{ version }}](https://github.com/openng-foundation/cashew/compare/{{ previous.version }}...{{ version }})
+{% endif %}
+"""
+footer = ""
+trim = true
+
+# Enables github.contributors in templates. The token is supplied via the
+# GITHUB_TOKEN env var (set in publish.yml) — never hardcoded here.
+[remote.github]
+owner = "openng-foundation"
+repo = "cashew"
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "v[0-9].*"
+topo_order = false
+sort_commits = "oldest"
+
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance" },
+  { message = "^refactor", group = "<!-- 3 -->Refactoring" },
+  { message = "^docs", group = "<!-- 4 -->Documentation" },
+  { message = "^test", group = "<!-- 5 -->Tests" },
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^chore\\(deps.*\\)", group = "<!-- 7 -->Dependencies" },
+  { message = "^(chore|ci|build|style)", group = "<!-- 6 -->Maintenance" },
+  { message = ".*", group = "<!-- 8 -->Other Changes" },
+]
