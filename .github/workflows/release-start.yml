@@ -1,0 +1,134 @@
+name: Start release
+
+# Flow:
+#   1. You create a DRAFT release manually in the GitHub UI (choose the new
+#      tag, e.g. v5.4.0, and click "Generate release notes" for raw notes).
+#      GitHub Actions receives no events for draft releases, so this workflow
+#      polls for them on a schedule (and can also be run manually from the
+#      Actions tab for an immediate pickup).
+#   2. When it finds a draft with no open release PR, it opens the
+#      version-bump PR.
+#   3. Merging that PR triggers publish.yml: npm publish, then the draft is
+#      published with notes reorganized by git-cliff.
+#
+# Idempotent by design: runs are no-ops when there is no draft, when an open
+# release PR already exists, or when main already carries the version.
+#
+# Security notes:
+# - Actions pinned to full commit SHAs; untrusted values passed via `env`.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # poll for new draft releases
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag of the draft release (e.g. v5.4.0). Defaults to the most recently created draft.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-start
+  cancel-in-progress: false
+
+jobs:
+  start-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: main
+
+      - name: Find draft release
+        id: draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            TAG=$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
+              --jq '[.[] | select(.draft == true and .tag_name == env.INPUT_TAG)][0].tag_name // empty')
+            if [ -z "$TAG" ]; then
+              echo "::error::No draft release found with tag '$INPUT_TAG'"
+              exit 1
+            fi
+          else
+            TAG=$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
+              --jq '[.[] | select(.draft == true)] | sort_by(.created_at) | last | .tag_name // empty')
+            if [ -z "$TAG" ]; then
+              if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+                echo "::error::No draft release found. Create one in the GitHub UI first (Releases -> Draft a new release)."
+                exit 1
+              fi
+              echo "No draft release found; nothing to do."
+              exit 0
+            fi
+          fi
+          echo "Found draft release: $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version and check for existing PR
+        id: version
+        if: steps.draft.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.draft.outputs.tag }}
+        run: |
+          VERSION="${TAG#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Draft release tag '$TAG' is not a valid semver version (expected e.g. v5.4.0)"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" > /dev/null 2>&1; then
+            echo "::error::Tag v${VERSION} already exists as a git tag"
+            exit 1
+          fi
+          OPEN_PRS=$(gh pr list --head "release/v${VERSION}" --base main --state open --json number --jq 'length')
+          if [ "$OPEN_PRS" -gt 0 ]; then
+            echo "Release PR for v${VERSION} already open; nothing to do."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Bump library version
+        if: steps.version.outputs.proceed == 'true'
+        working-directory: projects/openng/cashew
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: npm pkg set version="$VERSION"
+
+      - name: Create pull request
+        if: steps.version.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          BRANCH="release/v${VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          git add projects/openng/cashew/package.json
+
+          if git diff --cached --quiet; then
+            echo "package.json is already at ${VERSION}; nothing to do."
+            exit 0
+          fi
+
+          git commit -m "chore(release): ${VERSION}"
+          git push --force origin "$BRANCH"
+
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore(release): v${VERSION}" \
+            --body "Bumps \`@openng/cashew\` to \`${VERSION}\`, matching the draft release [v${VERSION}](https://github.com/${GITHUB_REPOSITORY}/releases).
+
+          Merging this PR publishes the package to npm via trusted publishing, then publishes the release with reorganized notes."
