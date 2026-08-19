@@ -1,30 +1,33 @@
 {
-	"name": "cashew",
-	"image": "mcr.microsoft.com/devcontainers/javascript-node:4-22-trixie",
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	"features": {
-		"ghcr.io/devcontainers-extra/features/angular-cli:2": {
-			"version": "20"
-		}
-	},
-	"customizations": {
-		"codespaces": {
-			"openFiles": ["README.md"]
-		},
-		"vscode": {
-			"extensions": [
-				"esbenp.prettier-vscode",
-				"orta.vscode-jest",
-				"angular.ng-template",
-				"editorconfig.editorconfig",
-				"vivaxy.vscode-conventional-commits",
-				"github.vscode-pull-request-github",
-				"github.vscode-github-actions"
-			],
-			"settings": {
-				"jest.rootPath": "projects/openng/cashew"
-			}
-		}
-	},
-	"postCreateCommand": "corepack enable && corepack prepare pnpm@11.18.0 --activate && pnpm install"
+  "name": "cashew",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:4-22-trixie",
+  "containerEnv": {
+    "PNPM_CONFIG_STORE_DIR": "/home/node/.pnpm-store"
+  },
+  // Features to add to the dev container. More info: https://containers.dev/features.
+  "features": {
+    "ghcr.io/devcontainers-extra/features/angular-cli:2": {
+      "version": "20"
+    }
+  },
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["README.md"]
+    },
+    "vscode": {
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "orta.vscode-jest",
+        "angular.ng-template",
+        "editorconfig.editorconfig",
+        "vivaxy.vscode-conventional-commits",
+        "github.vscode-pull-request-github",
+        "github.vscode-github-actions"
+      ],
+      "settings": {
+        "jest.rootPath": "projects/openng/cashew"
+      }
+    }
+  },
+  "postCreateCommand": "sudo corepack enable && corepack prepare pnpm@11.18.0 --activate && pnpm install"
 }
